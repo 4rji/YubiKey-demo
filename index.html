@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yubico demo website</title>
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f1f1f1;
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #f1f1f1;
+    }
+
+    #file-controls {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #file-controls button {
+      position: absolute;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      opacity: 0;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    #form-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateY(-22px);
+      pointer-events: none;
+    }
+
+    #form-layer[hidden] {
+      display: none;
+    }
+
+    .auth-card {
+      width: 558px;
+      max-width: calc(100% - 32px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      color: #666;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 2px 2px rgba(0, 0, 0, .2), 0 1px 5px rgba(0, 0, 0, .15);
+      font-family: HelveticaNeue, "Helvetica Neue", "Open Sans", Helvetica, Arial, sans-serif;
+      pointer-events: auto;
+    }
+
+    .auth-card.signin-card {
+      min-height: 563px;
+    }
+
+    .auth-card.register-card {
+      min-height: 690px;
+    }
+
+    .auth-title {
+      height: 135px;
+      min-height: 135px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      background: #9aca3c;
+      font-size: 48px;
+      font-weight: 400;
+      line-height: 1;
+    }
+
+    .auth-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 38px 80px 32px;
+    }
+
+    .auth-field {
+      position: relative;
+      margin-top: 12px;
+      padding-top: 18px;
+    }
+
+    .auth-field label {
+      position: absolute;
+      top: 27px;
+      left: 0;
+      color: #9c9c9c;
+      font-size: 16px;
+      line-height: 1;
+      pointer-events: none;
+      transform-origin: left top;
+      transition: top 150ms ease, font-size 150ms ease, color 150ms ease;
+    }
+
+    .auth-field:focus-within label,
+    .auth-field.has-value label {
+      top: 2px;
+      font-size: 12px;
+      color: #9aca3c;
+    }
+
+    .auth-field.error label {
+      color: #f44336;
+    }
+
+    .auth-field input {
+      width: 100%;
+      height: 38px;
+      margin: 0;
+      padding: 2px 0 0;
+      color: #666;
+      border: 0;
+      border-bottom: 1px solid #999;
+      border-radius: 0;
+      outline: 0;
+      background: transparent;
+      font: inherit;
+      font-size: 17px;
+      box-sizing: border-box;
+      appearance: none;
+    }
+
+    .auth-field input:focus {
+      border-bottom: 2px solid #9aca3c;
+    }
+
+    .auth-field.error input {
+      border-bottom-color: #f44336;
+    }
+
+    .auth-copy {
+      margin: 16px 0 0;
+      color: #9c9c9c;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .auth-copy.note {
+      margin-top: 20px;
+    }
+
+    .text-link {
+      display: inline;
+      margin: 0;
+      padding: 0;
+      color: #9aca3c;
+      border: 0;
+      background: none;
+      font: inherit;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .auth-action {
+      width: 100%;
+      height: 48px;
+      margin: auto 0 0;
+      color: #fff;
+      border: 0;
+      border-radius: 4px;
+      background: #9aca3c;
+      box-shadow: 0 3px 1px -2px rgba(0,0,0,.2), 0 2px 2px rgba(0,0,0,.14), 0 1px 5px rgba(0,0,0,.12);
+      font: inherit;
+      font-size: 14px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .auth-action:hover:not(:disabled) {
+      background: #6b8d2a;
+      box-shadow: 0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px rgba(0,0,0,.14), 0 1px 10px rgba(0,0,0,.12);
+    }
+
+    .auth-action:disabled {
+      color: rgba(0, 0, 0, .26);
+      background: rgba(0, 0, 0, .12);
+      box-shadow: none;
+      cursor: default;
+    }
+
+    .signin-card .auth-action {
+      margin-top: 80px;
+    }
+
+    .auth-card.failed {
+      animation: form-shake 320ms ease-in-out;
+    }
+
+    @keyframes form-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-7px); }
+      50% { transform: translateX(7px); }
+      75% { transform: translateX(-4px); }
+    }
+
+    .welcome-start { left: 20%; top: 55%; width: 60%; height: 45%; }
+    .register-signin { left: 48.8%; top: 58.5%; width: 5.5%; height: 5%; }
+    .register-submit { left: 35.3%; top: 82%; width: 29.5%; height: 6%; }
+    .security-signout { right: 1.6%; top: 1%; width: 8%; height: 5%; }
+    .security-key { left: 32%; top: 84%; width: 18%; height: 6%; }
+    .security-internal { left: 32.5%; top: 88.5%; width: 23%; height: 5%; }
+    .signin-register { left: 43.5%; top: 59.2%; width: 7%; height: 4%; }
+    .signin-submit { left: 35.3%; top: 70.5%; width: 29.5%; height: 5%; }
+
+    @media (max-width: 959px) {
+      #form-layer {
+        transform: none;
+      }
+
+      .auth-card,
+      .auth-card.signin-card,
+      .auth-card.register-card {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        min-height: 0;
+        border: 0;
+        border-radius: 0;
+      }
+
+      .auth-title {
+        height: 75px;
+        min-height: 75px;
+        align-items: flex-start;
+        padding-top: 10px;
+        font-size: 34px;
+        box-sizing: border-box;
+      }
+
+      .auth-body {
+        padding: 24px 32px 16px;
+      }
+
+      .welcome-start { left: 16px; top: 78%; width: 270px; height: 48px; }
+      .register-signin { left: 43%; top: 48%; width: 18%; height: 40px; }
+      .register-submit { left: 32px; right: 32px; bottom: 16px; top: auto; width: auto; height: 48px; }
+      .security-signout { right: 8px; top: 8px; width: 110px; height: 48px; }
+      .security-key { left: 16px; top: 74%; width: 190px; height: 48px; }
+      .security-internal { left: 16px; top: 91%; width: 250px; height: 48px; }
+      .signin-register { left: 39%; top: 52%; width: 24%; height: 40px; }
+      .signin-submit { left: 32px; right: 32px; bottom: 32px; top: auto; width: auto; height: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <iframe id="demo" title="Yubico WebAuthn demo" sandbox="allow-same-origin"></iframe>
+  <div id="file-controls" aria-hidden="true"></div>
+  <div id="form-layer" hidden></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // Firefox/WebAuthn is more consistent when the loopback relying party is
+      // the localhost name instead of a numeric IP address.
+      if (location.protocol === 'http:' && location.hostname === '127.0.0.1') {
+        const localhostUrl = new URL(location.href);
+        localhostUrl.hostname = 'localhost';
+        location.replace(localhostUrl);
+        return;
+      }
+
+      const pages = {
+        welcome: 'Yubico demo website (10_23_2026 5：19：40 PM).html',
+        register: 'Yubico demo website (10_23_2026 5：19：55 PM).html',
+        security: 'Yubico demo website (10_23_2026 5：20：26 PM).html',
+        signin: 'Yubico demo website (10_23_2026 5：20：53 PM).html'
+      };
+
+      const frame = document.getElementById('demo');
+      const fileControls = document.getElementById('file-controls');
+      const formLayer = document.getElementById('form-layer');
+      const directFileMode = location.protocol === 'file:';
+      const credentialStorageKey = 'yubico-demo-credential-id';
+      let currentPage = 'welcome';
+
+      function show(page) {
+        currentPage = page;
+        frame.src = pages[page];
+        history.replaceState(null, '', page === 'welcome' ? location.pathname : `#${page}`);
+        renderFileControls(page);
+        renderDynamicForm(page);
+      }
+
+      function fileButton(className, action) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        button.tabIndex = -1;
+        button.addEventListener('click', action);
+        fileControls.append(button);
+      }
+
+      function renderFileControls(page) {
+        fileControls.replaceChildren();
+        // The archived pages inside the sandboxed iframe are visual snapshots.
+        // Keep the parent-page hit targets enabled for both file:// and localhost;
+        // otherwise Safari focuses their original buttons without advancing.
+        fileControls.hidden = false;
+
+        if (page === 'welcome') {
+          fileButton('welcome-start', () => show('register'));
+        }
+
+        if (page === 'security') {
+          fileButton('security-signout', () => show('signin'));
+          fileButton('security-key', () => trySecurityKey('register'));
+          fileButton('security-internal', () => trySecurityKey('register'));
+        }
+
+      }
+
+      function fieldMarkup(id, label, type = 'text') {
+        return `<div class="auth-field"><label for="${id}">${label}*</label><input id="${id}" type="${type}" autocomplete="off" spellcheck="false"></div>`;
+      }
+
+      function updateFieldState(input) {
+        input.closest('.auth-field')?.classList.toggle('has-value', Boolean(input.value));
+      }
+
+      function renderDynamicForm(page) {
+        formLayer.replaceChildren();
+        const isRegister = page === 'register';
+        const isSignin = page === 'signin';
+        formLayer.hidden = !isRegister && !isSignin;
+        if (formLayer.hidden) return;
+
+        const card = document.createElement('section');
+        card.className = `auth-card ${isRegister ? 'register-card' : 'signin-card'}`;
+        card.innerHTML = isRegister
+          ? `<div class="auth-title">Create Account</div><div class="auth-body">${fieldMarkup('demo-username', 'Username')}${fieldMarkup('demo-password', 'Password', 'password')}${fieldMarkup('demo-password-check', 'Re-enter password', 'password')}<p class="auth-copy">I already have an account. <button class="text-link" type="button" data-go="signin">Sign in</button>.</p><p class="auth-copy note">Note: This account will be used for demonstration purposes only. Please do not provide any personal or private information. Accounts will expire after 24 hours. By registering you agree that your data will be treated in accordance with the <span style="text-decoration:underline">Yubico Privacy Policy</span>.</p><button class="auth-action" type="button" disabled>Register</button></div>`
+          : `<div class="auth-title">Sign in</div><div class="auth-body">${fieldMarkup('demo-username', 'Username')}${fieldMarkup('demo-password', 'Password', 'password')}<p class="auth-copy">Not registered? <button class="text-link" type="button" data-go="register">Click here</button> to create a new account.</p><button class="auth-action" type="button" disabled>Sign In</button></div>`;
+
+        formLayer.append(card);
+
+        const inputs = [...card.querySelectorAll('input')];
+        const action = card.querySelector('.auth-action');
+        const password = card.querySelector('#demo-password');
+        const passwordCheck = card.querySelector('#demo-password-check');
+
+        const update = () => {
+          inputs.forEach(updateFieldState);
+          const complete = inputs.every((input) => input.value.length > 0);
+          const matching = !passwordCheck || password.value === passwordCheck.value;
+          passwordCheck?.closest('.auth-field')?.classList.toggle('error', Boolean(passwordCheck.value) && !matching);
+          action.disabled = !complete || !matching;
+        };
+
+        inputs.forEach((input) => {
+          input.addEventListener('input', update);
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !action.disabled) action.click();
+          });
+        });
+
+        card.querySelector('[data-go]')?.addEventListener('click', (event) => {
+          show(event.currentTarget.dataset.go);
+        });
+
+        action.addEventListener('click', async () => {
+          if (action.disabled) return;
+
+          if (isSignin) {
+            action.disabled = true;
+            action.textContent = 'Waiting for security key…';
+
+            const authenticated = await trySecurityKey('authenticate');
+            if (!authenticated) {
+              location.assign('tryagain.html');
+              return;
+            }
+          }
+
+          // This is a local visual demo. The username and password are never stored
+          // or sent anywhere; WebAuthn is bound to the current local origin.
+          inputs.forEach((input) => { input.value = ''; });
+          show('security');
+        });
+
+        update();
+      }
+
+      function buttonByText(doc, text) {
+        return [...doc.querySelectorAll('button')]
+          .find((button) => button.textContent.trim().toLowerCase() === text.toLowerCase());
+      }
+
+      function clickableText(doc, text) {
+        return [...doc.querySelectorAll('span, a')]
+          .find((element) => element.textContent.trim().toLowerCase() === text.toLowerCase());
+      }
+
+      function openPageOnClick(element, page) {
+        if (!element) return;
+        element.style.cursor = 'pointer';
+        element.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          show(page);
+        });
+      }
+
+      function randomBytes(length) {
+        const value = new Uint8Array(length);
+        crypto.getRandomValues(value);
+        return value;
+      }
+
+      function toBase64Url(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      function fromBase64Url(value) {
+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+        const binary = atob(padded);
+        return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      }
+
+      async function trySecurityKey(mode) {
+        if (
+          directFileMode ||
+          !window.isSecureContext ||
+          !window.PublicKeyCredential ||
+          !navigator.credentials
+        ) return false;
+
+        try {
+          if (mode === 'register') {
+            const credential = await navigator.credentials.create({
+              publicKey: {
+                challenge: randomBytes(32),
+                rp: { id: location.hostname, name: 'Local YubiKey demo' },
+                user: {
+                  id: randomBytes(16),
+                  name: 'local-demo-user',
+                  displayName: 'Local demo user'
+                },
+                pubKeyCredParams: [
+                  { type: 'public-key', alg: -7 },
+                  { type: 'public-key', alg: -257 }
+                ],
+                authenticatorSelection: {
+                  authenticatorAttachment: 'cross-platform',
+                  userVerification: 'discouraged'
+                },
+                timeout: 60000,
+                attestation: 'none'
+              }
+            });
+
+            if (!credential) return false;
+            localStorage.setItem(credentialStorageKey, toBase64Url(credential.rawId));
+          } else {
+            const savedCredentialId = localStorage.getItem(credentialStorageKey);
+            // A non-empty credential list makes browsers ask for a roaming
+            // security key. If this local demo has no registered credential,
+            // use a throwaway ID so the native UI can report "not found".
+            const credentialId = savedCredentialId
+              ? fromBase64Url(savedCredentialId)
+              : randomBytes(32);
+            const allowCredentials = [{
+              type: 'public-key',
+              id: credentialId,
+              transports: ['usb', 'nfc', 'ble']
+            }];
+
+            await navigator.credentials.get({
+              publicKey: {
+                challenge: randomBytes(32),
+                rpId: location.hostname,
+                allowCredentials,
+                timeout: 60000,
+                userVerification: 'discouraged'
+              }
+            });
+          }
+          return true;
+        } catch (error) {
+          console.warn('Local WebAuthn demo failed:', error?.name || error);
+          return false;
+        }
+      }
+
+      function wireWelcome(doc) {
+        openPageOnClick(buttonByText(doc, 'Start the WebAuthn Demo'), 'register');
+      }
+
+      function wireRegister(doc) {
+        openPageOnClick(clickableText(doc, 'Sign in'), 'signin');
+
+        const form = doc.querySelector('form');
+        const password = doc.getElementById('pwd');
+        const passwordCheck = doc.getElementById('pwdCheck');
+
+        if (!form) return;
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          if (password && passwordCheck && password.value !== passwordCheck.value) return;
+          show('security');
+        });
+      }
+
+      function wireSecurity(doc) {
+        openPageOnClick(buttonByText(doc, 'Sign Out'), 'signin');
+
+        const securityKey = buttonByText(doc, 'Add Security Key');
+        if (securityKey) {
+          securityKey.addEventListener('click', (event) => {
+            event.preventDefault();
+            trySecurityKey('register');
+          });
+        }
+
+        const internalKey = buttonByText(doc, 'Add Internal authenticator');
+        if (internalKey) {
+          internalKey.addEventListener('click', (event) => {
+            event.preventDefault();
+            trySecurityKey('register');
+          });
+        }
+      }
+
+      function wireSignin(doc) {
+        openPageOnClick(clickableText(doc, 'Click here'), 'register');
+
+        const form = doc.querySelector('form');
+        const username = doc.getElementById('username');
+        const password = doc.getElementById('pwd');
+        const submit = buttonByText(doc, 'Sign In');
+
+        const update = () => {
+          if (!submit) return;
+          const enabled = Boolean(username?.value && password?.value);
+          submit.disabled = !enabled;
+          submit.tabIndex = enabled ? 0 : -1;
+          submit.classList.toggle('Mui-disabled', !enabled);
+        };
+
+        username?.addEventListener('input', update);
+        password?.addEventListener('input', update);
+        update();
+
+        if (!form) return;
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          trySecurityKey('authenticate');
+        });
+      }
+
+      frame.addEventListener('load', () => {
+        let doc;
+        try {
+          doc = frame.contentDocument;
+        } catch (_) {
+          return;
+        }
+
+        if (!doc) return;
+
+        // Keep the saved background, but avoid two overlapping interactive forms.
+        if (currentPage === 'register' || currentPage === 'signin') {
+          const savedCard = doc.querySelector('form')?.closest('.MuiCard-root');
+          if (savedCard) {
+            savedCard.style.visibility = 'hidden';
+            savedCard.inert = true;
+          }
+        }
+
+        doc.querySelectorAll('a').forEach((link) => {
+          link.addEventListener('click', (event) => event.preventDefault());
+        });
+
+        if (currentPage === 'welcome') wireWelcome(doc);
+        if (currentPage === 'security') wireSecurity(doc);
+      });
+
+      addEventListener('hashchange', () => {
+        const page = location.hash.slice(1);
+        if (Object.hasOwn(pages, page) && page !== currentPage) show(page);
+      });
+
+      const requestedPage = location.hash.slice(1);
+      show(Object.hasOwn(pages, requestedPage) ? requestedPage : 'welcome');
+    })();
+  </script>
+</body>
+</html>
